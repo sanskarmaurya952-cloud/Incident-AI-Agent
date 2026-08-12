@@ -24,15 +24,39 @@ def save_lesson(
     confidence_after: float,
 ):
 
-    # Create embedding from important text
-    embedding = create_embedding(
-        f"""
-        {incident_title}
-        {actual_resolution}
-        {lesson_learned}
-        {prevention}
-        """
-    )
+    print("========== SAVING LESSON ==========")
+
+    # ---------------------------------
+    # Create Embedding
+    # ---------------------------------
+
+    try:
+
+        embedding = create_embedding(
+            f"""
+            {incident_title}
+
+            {actual_resolution}
+
+            {lesson_learned}
+
+            {prevention}
+            """
+        )
+
+        embedding = json.dumps(embedding)
+
+        print("✅ Embedding Created")
+
+    except Exception as e:
+
+        print("❌ Embedding Error:", e)
+
+        embedding = "[]"
+
+    # ---------------------------------
+    # Save Lesson
+    # ---------------------------------
 
     lesson = Lesson(
         incident_id=incident_id,
@@ -43,18 +67,20 @@ def save_lesson(
         prevention=prevention,
         confidence_before=confidence_before,
         confidence_after=confidence_after,
-        embedding=json.dumps(embedding),
+        embedding=embedding,
     )
 
     db.add(lesson)
     db.commit()
     db.refresh(lesson)
 
+    print("✅ Lesson Saved Successfully")
+
     return lesson
 
 
 # =====================================
-# GET LESSON BY ID
+# GET LESSON
 # =====================================
 
 def get_lesson_by_id(
@@ -81,7 +107,7 @@ def get_all_lessons(db: Session):
 
 
 # =====================================
-# SEARCH LESSONS (Keyword Search)
+# SEARCH LESSON
 # =====================================
 
 def search_lessons(
@@ -102,7 +128,7 @@ def search_lessons(
 
 
 # =====================================
-# VECTOR SEARCH (Semantic Memory)
+# VECTOR SEARCH
 # =====================================
 
 def get_relevant_lessons(
@@ -117,7 +143,7 @@ def get_relevant_lessons(
 
 
 # =====================================
-# DELETE LESSON
+# DELETE
 # =====================================
 
 def delete_lesson(
@@ -161,6 +187,7 @@ def build_memory_context(
     for lesson in lessons:
 
         context += f"""
+
 Previous Incident:
 {lesson.incident_title}
 
@@ -176,7 +203,8 @@ Lesson Learned:
 Prevention:
 {lesson.prevention}
 
-------------------------------------------
+-------------------------------------
+
 """
 
     return context

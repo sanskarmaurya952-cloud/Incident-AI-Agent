@@ -4,12 +4,17 @@ from sqlalchemy import func
 from app.models.incident import Incident
 from app.schemas.incident import IncidentCreate
 
+from app.services.lesson_service import save_lesson
 
 # ==============================
 # CREATE INCIDENT
 # ==============================
 
-def create_incident(db: Session, incident: IncidentCreate, user_id: int):
+def create_incident(
+    db: Session,
+    incident: IncidentCreate,
+    user_id: int,
+):
     new_incident = Incident(
         title=incident.title,
         description=incident.description,
@@ -40,7 +45,10 @@ def get_all_incidents(db: Session):
 # GET INCIDENT BY ID
 # ==============================
 
-def get_incident_by_id(db: Session, incident_id: int):
+def get_incident_by_id(
+    db: Session,
+    incident_id: int,
+):
     return (
         db.query(Incident)
         .filter(Incident.id == incident_id)
@@ -52,7 +60,10 @@ def get_incident_by_id(db: Session, incident_id: int):
 # FIND SIMILAR INCIDENTS
 # ==============================
 
-def find_similar_incidents(db: Session, title: str):
+def find_similar_incidents(
+    db: Session,
+    title: str,
+):
     return (
         db.query(Incident)
         .filter(
@@ -66,9 +77,14 @@ def find_similar_incidents(db: Session, title: str):
 # SAVE AI ANALYSIS
 # ==============================
 
-def save_ai_analysis(db: Session, incident: Incident, analysis: dict):
+def save_ai_analysis(
+    db: Session,
+    incident: Incident,
+    analysis: dict,
+):
 
     incident.ai_summary = analysis["summary"]
+
     incident.root_cause = analysis["root_cause"]
 
     incident.recommended_action = "\n".join(
@@ -83,6 +99,22 @@ def save_ai_analysis(db: Session, incident: Incident, analysis: dict):
 
     db.commit()
     db.refresh(incident)
+
+    # ==========================================
+    # SAVE LESSON (Hindsight Memory)
+    # ==========================================
+
+    save_lesson(
+        db=db,
+        incident_id=incident.id,
+        incident_title=incident.title,
+        ai_prediction=analysis["summary"],
+        actual_resolution=analysis["root_cause"],
+        lesson_learned=analysis["summary"],
+        prevention=incident.prevention,
+        confidence_before=0.50,
+        confidence_after=analysis.get("confidence", 0.95),
+    )
 
     return incident
 
@@ -170,7 +202,9 @@ def get_incidents_by_severity(
 
 def get_dashboard_stats(db: Session):
 
-    total = db.query(func.count(Incident.id)).scalar()
+    total = db.query(
+        func.count(Incident.id)
+    ).scalar()
 
     open_count = (
         db.query(func.count(Incident.id))

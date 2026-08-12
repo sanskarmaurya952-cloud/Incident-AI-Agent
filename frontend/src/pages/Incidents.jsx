@@ -1,57 +1,173 @@
 import { useEffect, useState } from "react";
-import { getAllIncidents } from "../api/incidentApi";
+import { toast } from "react-toastify";
+
+import IncidentTable from "../components/IncidentTable";
+import Loading from "../components/Loading";
+import EmptyState from "../components/EmptyState";
+import AnalysisModal from "../components/modals/AnalysisModal";
+
+import {
+  getAllIncidents,
+  analyzeIncident,
+  deleteIncident,
+  updateIncidentStatus,
+} from "../api/incidentApi";
 
 function Incidents() {
   const [incidents, setIncidents] = useState([]);
+  const [filteredIncidents, setFilteredIncidents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  // ==========================
+  // Analysis Modal
+  // ==========================
+
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const [memoryUsed, setMemoryUsed] = useState(false);
+
+  const [analysis, setAnalysis] = useState({
+    summary: "",
+    root_cause: "",
+    recommended_action: [],
+    prevention: [],
+    confidence: 0,
+  });
+
+  // ==========================
+  // Load Incidents
+  // ==========================
+
+  const loadIncidents = async () => {
+    try {
+      setLoading(true);
+
+      const data = await getAllIncidents();
+
+      setIncidents(data);
+      setFilteredIncidents(data);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load incidents");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadIncidents();
   }, []);
 
-  const loadIncidents = async () => {
+  // ==========================
+  // Search
+  // ==========================
+
+  useEffect(() => {
+    const result = incidents.filter((incident) =>
+      incident.title.toLowerCase().includes(search.toLowerCase())
+    );
+
+    setFilteredIncidents(result);
+  }, [search, incidents]);
+
+  // ==========================
+  // Analyze
+  // ==========================
+
+  const handleAnalyze = async (id) => {
     try {
-      const data = await getAllIncidents();
-      setIncidents(data);
-    } catch (err) {
-      console.error(err);
+      const response = await analyzeIncident(id);
+
+      setAnalysis(response.analysis);
+
+      setMemoryUsed(response.memory_used);
+
+      setModalOpen(true);
+
+      toast.success("AI Analysis Completed");
+
+      await loadIncidents();
+    } catch (error) {
+      console.error(error);
+      toast.error("Analysis Failed");
+    }
+  };
+
+  // ==========================
+  // Delete
+  // ==========================
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this incident?")) return;
+
+    try {
+      await deleteIncident(id);
+
+      toast.success("Incident Deleted Successfully");
+
+      loadIncidents();
+    } catch (error) {
+      console.error(error);
+      toast.error("Delete Failed");
+    }
+  };
+
+  // ==========================
+  // Status Update
+  // ==========================
+
+  const handleStatusChange = async (id, status) => {
+    try {
+      await updateIncidentStatus(id, status);
+
+      toast.success("Status Updated");
+
+      loadIncidents();
+    } catch (error) {
+      console.error(error);
+      toast.error("Status Update Failed");
     }
   };
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-6">Incidents</h1>
+    <>
+      <div>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">
+            Incidents
+          </h1>
 
-      <div className="overflow-x-auto">
-        <table className="w-full border border-slate-700 rounded-lg">
-          <thead className="bg-slate-800">
-            <tr>
-              <th className="p-3 text-left">ID</th>
-              <th className="p-3 text-left">Title</th>
-              <th className="p-3 text-left">Severity</th>
-              <th className="p-3 text-left">Status</th>
-              <th className="p-3 text-left">Created</th>
-            </tr>
-          </thead>
+          <input
+            type="text"
+            placeholder="Search Incident..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          />
+        </div>
 
-          <tbody>
-            {incidents.map((item) => (
-              <tr
-                key={item.id}
-                className="border-t border-slate-700 hover:bg-slate-800"
-              >
-                <td className="p-3">{item.id}</td>
-                <td className="p-3">{item.title}</td>
-                <td className="p-3">{item.severity}</td>
-                <td className="p-3">{item.status}</td>
-                <td className="p-3">
-                  {new Date(item.created_at).toLocaleString()}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {loading ? (
+          <Loading />
+        ) : filteredIncidents.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <IncidentTable
+            incidents={filteredIncidents}
+            onAnalyze={handleAnalyze}
+            onDelete={handleDelete}
+            onStatusChange={handleStatusChange}
+          />
+        )}
       </div>
-    </div>
+
+      <AnalysisModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        analysis={analysis}
+        memoryUsed={memoryUsed}
+      />
+    </>
   );
 }
 
