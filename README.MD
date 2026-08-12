@@ -612,7 +612,7 @@ to create a smarter approach to incident response.
 
 ### Team Name
 
-**Incident AI Agent**
+**ALPHA++**
 
 ### Team Members
 
